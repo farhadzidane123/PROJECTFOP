@@ -1,0 +1,11 @@
+=== BEGIN FILE: C:\Users\User\Desktop\CalendarApp\data/event.csv ===
+eventId,title,description,startDateTime,endDateTime,
+1,test,test,test,test,test
+2,est,test,test,test,test
+=== END FILE: C:\Users\User\Desktop\CalendarApp\data/event.csv ===
+
+=== BEGIN FILE: C:\Users\User\Desktop\CalendarApp\data/recurrent.csv ===
+eventId,recurrentInterval,recurrentTimes,recurrentEndDate
+1,1d,0,2025-10-08
+=== END FILE: C:\Users\User\Desktop\CalendarApp\data/recurrent.csv ===
+
