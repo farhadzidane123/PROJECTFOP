@@ -8,7 +8,6 @@ import java.io.File;
 /**
  * BackupService.java
  * Handles all file I/O for backup and restore operations.
- * This version auto-detects project root so backups always work in VS Code.
  */
 public class BackupService {
 
@@ -17,12 +16,11 @@ public class BackupService {
     private static final String DATA_DIR = "data";
 
     public static final String CURRENT_EVENT_FILE = DATA_DIR + "/event.csv";
-    public static final String CURRENT_RECURRENT_FILE = DATA_DIR + "/recurrent.csv";
 
     public static final String BACKUP_FILE = BACKUP_DIR + "/calendar_backup.txt";
 
     /**
-     * Creates a backup file of both event and recurrent data.
+     * Creates a backup file of event data.
      */
     public static boolean createBackup() {
 
@@ -45,9 +43,6 @@ public class BackupService {
 
             // Backup event.csv
             copyFile(CURRENT_EVENT_FILE, backupWriter);
-
-            // Backup recurrent.csv
-            copyFile(CURRENT_RECURRENT_FILE, backupWriter);
 
             System.out.println("Backup completed successfully!");
             System.out.println("\n=== DEBUG INFO ===");
@@ -75,6 +70,18 @@ public class BackupService {
         BufferedReader reader = null;
 
         try {
+            File sourceFile = new File(sourcePath);
+
+            // If source file doesn't exist, create empty backup section
+            if (!sourceFile.exists()) {
+                backupWriter.write("=== BEGIN FILE: " + sourcePath + " ===");
+                backupWriter.newLine();
+                backupWriter.write("=== END FILE: " + sourcePath + " ===");
+                backupWriter.newLine();
+                backupWriter.newLine();
+                return;
+            }
+
             reader = new BufferedReader(new FileReader(sourcePath));
             String line;
 
@@ -96,10 +103,16 @@ public class BackupService {
         }
     }
 
-    public static boolean restoreEvents() {
+    /**
+     * Restores events with option to overwrite or append
+     * 
+     * @param overwrite true to overwrite existing data, false to append
+     */
+    public static boolean restoreEvents(boolean overwrite) {
 
         System.out.println("\n--- Starting Restore Process ---");
         System.out.println("Reading from: " + BACKUP_FILE);
+        System.out.println("Mode: " + (overwrite ? "OVERWRITE" : "APPEND"));
 
         // Check if backup file exists
         File backupFile = new File(BACKUP_FILE);
@@ -136,13 +149,27 @@ public class BackupService {
                     }
 
                     // Extract the file path from the marker
-                    // Format: "=== BEGIN FILE: /path/to/file.csv ==="
                     currentFilePath = extractFilePath(line);
 
                     if (currentFilePath != null) {
-                        // Open a new writer for this file (overwrite mode)
-                        currentWriter = new BufferedWriter(new FileWriter(currentFilePath, false));
-                        System.out.println("Restoring to: " + currentFilePath);
+                        File targetFile = new File(currentFilePath);
+                        boolean fileExists = targetFile.exists();
+
+                        if (overwrite) {
+                            // Overwrite mode: create new file or replace existing
+                            currentWriter = new BufferedWriter(new FileWriter(currentFilePath, false));
+                            System.out.println("Restoring to: " + currentFilePath + " (OVERWRITE)");
+                        } else {
+                            // Append mode: preserve existing content
+                            if (fileExists) {
+                                System.out.println("Restoring to: " + currentFilePath + " (APPEND)");
+                                currentWriter = new BufferedWriter(new FileWriter(currentFilePath, true));
+                                // Don't write header again in append mode
+                            } else {
+                                System.out.println("Restoring to: " + currentFilePath + " (NEW FILE)");
+                                currentWriter = new BufferedWriter(new FileWriter(currentFilePath, false));
+                            }
+                        }
                     }
                     continue; // Skip the marker line
                 }
@@ -160,9 +187,17 @@ public class BackupService {
                 }
 
                 // Write data lines to the current file
-                if (currentWriter != null && !line.isEmpty()) {
-                    currentWriter.write(line);
-                    currentWriter.newLine();
+                if (currentWriter != null) {
+                    // In append mode, skip header if it's the first line and file exists
+                    // Simplified header check for restoration in append mode
+                    if (!overwrite && line.startsWith("eventId,") && new File(currentFilePath).length() > 0) {
+                        continue;
+                    }
+
+                    if (!line.isEmpty()) {
+                        currentWriter.write(line);
+                        currentWriter.newLine();
+                    }
                 }
             }
 
