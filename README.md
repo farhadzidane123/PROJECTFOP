@@ -9,6 +9,8 @@ This assignment was a collaborative effort of these people:
 
 This project/assignment is deemed as a success with great communication and teamwork from each member. 
 
+To run this code, open all .java files and run StartPage.java
+
 Relevant files regarding the assignment can be found in the same repository. 
 Any suggestions or criticism may be emailed to 24001142@siswa.um.edu.my
 
