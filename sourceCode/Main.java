@@ -7,7 +7,7 @@ import java.util.Scanner;
 public class Main {
 
     // Paths for data files
-    private static final String EVENT_FILE = "data/event.csv";
+    private static final String EVENT_FILE = "../data/event.csv";
 
     public static void main(String[] args) {
         System.out.println("==============================================");
@@ -17,34 +17,47 @@ public class Main {
         // 1. System Check: Ensure 'data' and 'backup' directories and files exist
         try {
             // Ensure data directory exists
-            File dataDir = new File("data");
+            File dataDir = new File("../data");
             if (!dataDir.exists()) {
                 dataDir.mkdirs();
                 System.out.println("✓ Created 'data' directory.");
             }
 
             // Ensure backup directory exists
-            File backupDir = new File("backup");
+            File backupDir = new File("../backup");
             if (!backupDir.exists()) {
                 backupDir.mkdirs();
                 System.out.println("✓ Created 'backup' directory.");
             }
 
             // Ensure CSV file exists with header
-            ensureFileExists(EVENT_FILE, "eventId,title,description,startDateTime,endDateTime");
+            ensureFileExists(EVENT_FILE,
+                    "eventId,title,description,startDateTime,endDateTime,frequency,interval,recurrenceEndDate,maxOccurrences,exceptions");
 
             System.out.println("✓ System setup complete: Source files ready.\n");
         } catch (Exception e) {
-            System.err.println("❌ CRITICAL ERROR: Could not set up directories or files.");
+            System.err.println("✗ CRITICAL ERROR: Could not set up directories or files.");
             System.err.println("Please check file permissions and try again.");
             e.printStackTrace();
             return;
         }
 
-        // 2. Create EventManager instance
+        // 2. Initialize services
+        NotificationService.loadSettings();
+        AdditionalFieldsService.initialize();
+
+        // 3. Create EventManager instance
         EventManager eventManager = new EventManager();
 
-        // 3. Show interactive menu
+        // 4. Show startup notification
+        String notification = NotificationService.checkUpcomingEvents(eventManager.getRecurringEventsList());
+        if (notification != null) {
+            System.out.println("\n" + "=".repeat(60));
+            System.out.println(notification);
+            System.out.println("=".repeat(60) + "\n");
+        }
+
+        // 5. Show interactive menu
         showMenu(eventManager);
     }
 
@@ -68,9 +81,12 @@ public class Main {
             System.out.println("7. Search Events");
             System.out.println("8. Create Backup");
             System.out.println("9. Restore from Backup");
+            System.out.println("10. Manage Additional Fields");
+            System.out.println("11. View Event Statistics");
+            System.out.println("12. Notification Settings");
             System.out.println("0. Exit");
             System.out.println("==============================================");
-            System.out.print("Enter your choice (0-9): ");
+            System.out.print("Enter your choice (0-12): ");
 
             try {
                 int choice = scanner.nextInt();
@@ -115,6 +131,18 @@ public class Main {
                         performRestore();
                         break;
 
+                    case 10: // Manage Additional Fields
+                        manageAdditionalFields(eventManager, scanner);
+                        break;
+
+                    case 11: // View Event Statistics
+                        viewStatistics(eventManager);
+                        break;
+
+                    case 12: // Notification Settings
+                        configureNotifications(scanner);
+                        break;
+
                     case 0: // Exit
                         System.out.println("Exiting Calendar and Scheduler App.");
                         System.out.println("Goodbye! 👋");
@@ -122,11 +150,11 @@ public class Main {
                         break;
 
                     default:
-                        System.out.println("❌ Invalid choice. Please enter 0-9.");
+                        System.out.println("✗ Invalid choice. Please enter 0-12.");
                 }
 
             } catch (Exception e) {
-                System.out.println("❌ Invalid input. Please enter a number (0-9).");
+                System.out.println("✗ Invalid input. Please enter a number (0-12).");
                 scanner.nextLine(); // Clear the invalid input
             }
         }
@@ -135,7 +163,7 @@ public class Main {
     }
 
     /**
-     * Performs the backup operation with user feedback and a "Go Back" option.
+     * Performs the backup operation with user feedback
      */
     private static void performBackup() {
         Scanner scanner = new Scanner(System.in);
@@ -152,7 +180,7 @@ public class Main {
         }
 
         if (!confirmation.equals("yes") && !confirmation.equals("y")) {
-            System.out.println("❌ Invalid input. Returning to main menu.");
+            System.out.println("✗ Invalid input. Returning to main menu.");
             return;
         }
 
@@ -161,17 +189,15 @@ public class Main {
         System.out.println("\n----------------------------------------------");
         if (success) {
             System.out.println("✅ BACKUP SUCCESSFUL!");
-            System.out.println("Your calendar data has been safely backed up.");
         } else {
-            System.out.println("❌ BACKUP FAILED!");
+            System.out.println("✗ BACKUP FAILED!");
             System.out.println("Please check the error messages above.");
         }
         System.out.println("----------------------------------------------");
     }
 
     /**
-     * Performs the restore operation with user confirmation, overwrite option, and
-     * "Go Back".
+     * Performs the restore operation with user confirmation
      */
     private static void performRestore() {
         Scanner scanner = new Scanner(System.in);
@@ -182,20 +208,20 @@ public class Main {
         System.out.println("\nChoose restore mode:");
         System.out.println("1. OVERWRITE - Replace all current data with backup");
         System.out.println("2. APPEND - Add backup data to existing data");
-        System.out.println("0. GO BACK to main menu"); // Explicit Go Back option
+        System.out.println("0. GO BACK to main menu");
         System.out.print("\nEnter your choice (0-2): ");
 
         try {
             int mode = scanner.nextInt();
             scanner.nextLine(); // Consume newline
 
-            if (mode == 0) { // Check for 'Go Back'
+            if (mode == 0) {
                 System.out.println("\n✓ Restore operation cancelled. Returning to main menu.");
-                return; // Exits the function, returning to the main menu loop
+                return;
             }
 
             if (mode != 1 && mode != 2) {
-                System.out.println("\n❌ Invalid choice!");
+                System.out.println("\n✗ Invalid choice!");
                 return;
             }
 
@@ -219,12 +245,11 @@ public class Main {
                 System.out.println("\n----------------------------------------------");
                 if (success) {
                     System.out.println("✅ RESTORE SUCCESSFUL!");
-                    System.out.println("Your calendar data has been restored from backup.");
                     if (!overwrite) {
                         System.out.println("Backup data has been appended to existing events.");
                     }
                 } else {
-                    System.out.println("❌ RESTORE FAILED!");
+                    System.out.println("✗ RESTORE FAILED!");
                     System.out.println("Please check the error messages above.");
                 }
                 System.out.println("----------------------------------------------");
@@ -233,8 +258,99 @@ public class Main {
             }
 
         } catch (Exception e) {
-            System.out.println("\n❌ Invalid input!");
+            System.out.println("\n✗ Invalid input!");
             scanner.nextLine(); // Clear invalid input
+        }
+    }
+
+    /**
+     * Manage additional fields for events
+     */
+    private static void manageAdditionalFields(EventManager eventManager, Scanner scanner) {
+        System.out.println("=== MANAGE ADDITIONAL FIELDS ===");
+        eventManager.viewEvents();
+
+        if (eventManager.getRecurringEventsList().isEmpty()) {
+            System.out.println("No events available.");
+            return;
+        }
+
+        System.out.print("\nEnter event ID to manage additional fields (0 to cancel): ");
+        try {
+            int eventId = scanner.nextInt();
+            scanner.nextLine();
+
+            if (eventId == 0) {
+                System.out.println("Cancelled. Returning to main menu.");
+                return;
+            }
+
+            // Check if event exists
+            boolean found = false;
+            for (RecurringEvent.EventSeries event : eventManager.getRecurringEventsList()) {
+                if (event.eventId == eventId) {
+                    found = true;
+                    break;
+                }
+            }
+
+            if (!found) {
+                System.out.println("Event ID not found!");
+                return;
+            }
+
+            AdditionalFieldsService.manageFieldsConsole(eventId, scanner);
+
+        } catch (Exception e) {
+            System.out.println("Invalid input!");
+            scanner.nextLine();
+        }
+    }
+
+    /**
+     * View event statistics
+     */
+    private static void viewStatistics(EventManager eventManager) {
+        System.out.println("\n" + StatisticsService.generateStatistics(eventManager.getRecurringEventsList()));
+
+        System.out.println("\n📌 Quick Stats:");
+        System.out.println("   • Next 7 days: " + StatisticsService.getUpcomingEventsCount(
+                eventManager.getRecurringEventsList(), 7) + " event occurrences");
+        System.out.println("   • Next 30 days: " + StatisticsService.getUpcomingEventsCount(
+                eventManager.getRecurringEventsList(), 30) + " event occurrences");
+    }
+
+    /**
+     * Configure notification settings
+     */
+    private static void configureNotifications(Scanner scanner) {
+        System.out.println("=== NOTIFICATION SETTINGS ===");
+        System.out.println("\n" + NotificationService.getSettingsInfo());
+        System.out.println("\nHow many minutes before an event would you like to be reminded?");
+        System.out.println("Common options: 15, 30, 60 (1 hour), 1440 (1 day)");
+        System.out.print("Enter minutes (or 0 to cancel): ");
+
+        try {
+            int minutes = scanner.nextInt();
+            scanner.nextLine();
+
+            if (minutes == 0) {
+                System.out.println("Cancelled. Settings unchanged.");
+                return;
+            }
+
+            if (minutes < 0) {
+                System.out.println("Invalid value. Minutes must be positive.");
+                return;
+            }
+
+            NotificationService.setReminderMinutes(minutes);
+            System.out.println("\n✅ Notification settings updated!");
+            System.out.println(NotificationService.getSettingsInfo());
+
+        } catch (Exception e) {
+            System.out.println("Invalid input!");
+            scanner.nextLine();
         }
     }
 

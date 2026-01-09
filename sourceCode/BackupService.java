@@ -9,13 +9,15 @@ import java.io.File;
  * BackupService.java
  * Handles all file I/O for backup and restore operations.
  */
+
 public class BackupService {
 
-    // Use relative paths that work from where the program runs
-    private static final String BACKUP_DIR = "backup";
-    private static final String DATA_DIR = "data";
+    // Use relative paths - go up one level from sourceCode folder
+    private static final String BACKUP_DIR = "../backup";
+    private static final String DATA_DIR = "../data";
 
     public static final String CURRENT_EVENT_FILE = DATA_DIR + "/event.csv";
+    public static final String ADDITIONAL_FIELDS_FILE = DATA_DIR + "/additional.csv";
 
     public static final String BACKUP_FILE = BACKUP_DIR + "/calendar_backup.txt";
 
@@ -44,12 +46,11 @@ public class BackupService {
             // Backup event.csv
             copyFile(CURRENT_EVENT_FILE, backupWriter);
 
-            System.out.println("Backup completed successfully!");
-            System.out.println("\n=== DEBUG INFO ===");
-            System.out.println("Current working directory: " + new File(".").getAbsolutePath());
-            System.out.println("Backup file absolute path: " + new File(BACKUP_FILE).getAbsolutePath());
-            System.out.println("Does backup file exist? " + new File(BACKUP_FILE).exists());
-            System.out.println("==================");
+            // Backup additional.csv
+            copyFile(ADDITIONAL_FIELDS_FILE, backupWriter);
+
+            System.out.println("\n✅ Backup has been completed to backup folder");
+            System.out.println("   Location: " + new File(BACKUP_FILE).getAbsolutePath());
             return true;
 
         } catch (IOException e) {
@@ -190,7 +191,8 @@ public class BackupService {
                 if (currentWriter != null) {
                     // In append mode, skip header if it's the first line and file exists
                     // Simplified header check for restoration in append mode
-                    if (!overwrite && line.startsWith("eventId,") && new File(currentFilePath).length() > 0) {
+                    if (!overwrite && (line.startsWith("eventId,") || line.startsWith("fieldName,"))
+                            && new File(currentFilePath).length() > 0) {
                         continue;
                     }
 
@@ -206,7 +208,7 @@ public class BackupService {
                 currentWriter.close();
             }
 
-            System.out.println("\nRestore completed successfully!");
+            System.out.println("\n✅ Restore completed successfully!");
             System.out.println("Your calendar data has been restored from backup.");
             return true;
 
