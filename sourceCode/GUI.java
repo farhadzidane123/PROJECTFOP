@@ -16,7 +16,6 @@ public class GUI {
 
     public static void main(String[] args) {
         try {
-            // Set system look and feel
             UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
         } catch (Exception e) {
             e.printStackTrace();
@@ -25,15 +24,29 @@ public class GUI {
     }
 
     void start() {
+        start(new JFrame("Calendar"));
+    }
+
+    // --- UPDATED START METHOD ---
+    void start(JFrame window) {
+        this.frame = window;
+
+        // FIXED: Completely replace the ContentPane.
+        // This removes the StartPage's background image painting logic entirely.
+        JPanel mainContainer = new JPanel(new BorderLayout());
+        frame.setContentPane(mainContainer);
+
+        // Standard setup
+        frame.setTitle("Calendar");
+        frame.setSize(1150, 780);
+        frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+
+        // We don't need frame.setLayout() because we set the content pane above
+
         initializeSystem();
         NotificationService.loadSettings();
         AdditionalFieldsService.initialize();
         eventManager = new EventManager();
-
-        frame = new JFrame("Calendar");
-        frame.setSize(1150, 780);
-        frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        frame.setLayout(new BorderLayout());
 
         frame.add(sidebar(), BorderLayout.WEST);
         frame.add(topBar(), BorderLayout.NORTH);
@@ -42,6 +55,12 @@ public class GUI {
         frame.add(calendarPanel, BorderLayout.CENTER);
 
         refreshCalendar();
+
+        // Force a layout refresh to ensure components snap to the right size
+        frame.revalidate();
+        frame.repaint();
+
+        // Ensure it stays centered (though it shouldn't move since size matches)
         frame.setLocationRelativeTo(null);
         frame.setVisible(true);
 
@@ -90,8 +109,6 @@ public class GUI {
         s.add(sideBtn("💾 Backup", e -> createBackupDialog()));
         s.add(sideBtn("♻️ Restore", e -> restoreBackupDialog()));
 
-        // Dark mode button removed
-
         return s;
     }
 
@@ -136,9 +153,22 @@ public class GUI {
         calendarPanel.setLayout(new GridLayout(7, 7, 8, 8));
         calendarPanel.setBorder(BorderFactory.createEmptyBorder(15, 15, 15, 15));
 
-        JLabel title = (JLabel) ((JPanel) frame.getContentPane()
-                .getComponent(1)).getClientProperty("title");
-        title.setText(currentMonth.getMonth() + " " + currentMonth.getYear());
+        JLabel title = null;
+        // Search specifically inside the Top Bar (NORTH component)
+        if (frame.getContentPane() instanceof JPanel) {
+            BorderLayout layout = (BorderLayout) ((JPanel) frame.getContentPane()).getLayout();
+            // This is a robust way to find the title even after content pane swap
+            for (Component c : frame.getContentPane().getComponents()) {
+                if (c instanceof JPanel && ((JPanel) c).getClientProperty("title") != null) {
+                    title = (JLabel) ((JPanel) c).getClientProperty("title");
+                    break;
+                }
+            }
+        }
+
+        if (title != null) {
+            title.setText(currentMonth.getMonth() + " " + currentMonth.getYear());
+        }
 
         // Day headers
         String[] days = { "Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat" };
